@@ -1,0 +1,28 @@
+{
+  "name": "elm-package-prefixer",
+  "version": "1.0.0",
+  "description": "Prefix existing elm packages to avoid namespace collisions.",
+  "main": "bin/elm-package-prefixer",
+  "scripts": {
+    "build": "NODE_ENV=production node build.js",
+    "build:dev": "NODE_ENV=development node build.js"
+  },
+  "keywords": [
+    "elm",
+    "prefix",
+    "prefixer",
+    "cli",
+    "tool"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "node-elm-compiler": "^5.0.4",
+    "parcel-bundler": "^1.12.4",
+    "parcel-plugin-shebang": "^1.2.8"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.0",
+    "xmlhttprequest": "^1.8.0"
+  }
+}
