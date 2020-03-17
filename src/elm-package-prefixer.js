@@ -1,9 +1,7 @@
-#!/usr/bin/env node
 const { Elm } = require('./elm/Main.elm')
 const Fetch = require('node-fetch')
 const Fs = require('fs')
 const Path = require('path')
-const { XMLHttpRequest } = require('xmlhttprequest')
 
 const Filesystem = require('./js/filesystem')
 const Prompt = require('./js/prompt')
@@ -16,8 +14,6 @@ const getPackages = isDev
 
 //
 getPackages.then(packages => {
-  global.XMLHttpRequest = XMLHttpRequest
-
   const args = process.argv.slice(2).join(' ')
   const app = Elm.Main.init({
     flags: { args, packages }
