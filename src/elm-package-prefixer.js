@@ -22,6 +22,10 @@ getPackages.then(packages => {
   })
 
   app.ports.exit && app.ports.exit.subscribe(code => {
+    // It's common to want to notify the user that something has completed or
+    // something went wrong before we exit the process. We wrap the call to exit
+    // in a 0 second timeout to push it to the back of the event queue and let
+    // other things run first.
     setTimeout(() => process.exit(code || 1), 0)
   })
 
@@ -40,4 +44,6 @@ getPackages.then(packages => {
   }
 }).catch(e => {
   console.error(e)
+
+  process.exit(1)
 })
