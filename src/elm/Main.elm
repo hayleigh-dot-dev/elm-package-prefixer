@@ -2,6 +2,7 @@ port module Main exposing (main)
 
 {- Imports ------------------------------------------------------------------ -}
 import Arguments exposing (Arguments)
+import Elm.Docs
 import Http
 import Json.Decode
 import Task
@@ -154,6 +155,7 @@ fetchPackageNames =
 {-| -}
 type Msg
   = GotPackages (Result Http.Error (List String))
+  | GotPackageDocs (Result Http.Error (List Elm.Docs.Module))
   -- Ports responses
   | GotFilesystemResponse (Filesystem.Response FilesystemTag)
   | GotPromptResponse (Prompt.Response PromptTag)
@@ -161,7 +163,7 @@ type Msg
 {-| -}
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-  case Debug.log "msg" msg of
+  case msg of
     GotPackages (Ok packages) ->
       -- TODO: Should we save the result to a file to be used as cache in the
       -- future?
@@ -186,11 +188,43 @@ update msg model =
           ]
       )
 
+    GotPackageDocs (Ok docs) ->
+      ( model
+      , Cmd.none
+      )
+
+    GotPackageDocs (Err _) ->
+      ( model
+      , Cmd.batch
+          [ notify "Error fatching package docs, did you enter the tag correctly?"
+          , exit 1
+          ]
+      )
+
     GotPromptResponse response ->
       gotPromptResponse response model
 
     GotFilesystemResponse response ->
       gotFilesystemResponse response model
+
+{-| -}
+fetchDocs : String -> String -> Cmd Msg
+fetchDocs package tag =
+  let
+    url = 
+      "https://package.elm-lang.org/packages/" ++ package ++ "/" ++ tag ++ "/docs.json"
+  in
+  Http.request
+    { method = "GET"
+    , headers =
+      [ Http.header "accept-encoding" "gzip"
+      ]
+    , url = url
+    , body = Http.emptyBody
+    , expect = Http.expectJson GotPackageDocs (Json.Decode.list Elm.Docs.decoder)
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 
 {- Subscriptions ------------------------------------------------------------ -}
@@ -230,9 +264,25 @@ checkOutDir dir =
     |> Filesystem.run
 
 {-| -}
+createOutDir : String -> Cmd msg
+createOutDir path =
+  Filesystem.sequence filesystemTagToString
+    |> Filesystem.andThen (Filesystem.makeDir path)
+    |> Filesystem.andThen (Filesystem.readDir path)
+    |> Filesystem.andThen (Filesystem.expectDir OutDir)
+    |> Filesystem.run
+
+{-| -}
 gotFilesystemResponse : Filesystem.Response FilesystemTag -> Model -> (Model, Cmd Msg)
 gotFilesystemResponse response model =
   case response of
+    -- The directory is empty, we can go ahead and safely get to work!
+    Filesystem.GotDir OutDir [] ->
+      ( model
+      , fetchDocs model.arguments.name model.arguments.tag
+      )
+
+
     -- If there are files in the directory we should prompt the user to confirm
     -- if they're happy to proceed. We don't actually care what the files are
     -- (maybe we will in the future).
@@ -279,6 +329,7 @@ filesystemTagFromString tag =
 type PromptTag
   = CreateDirectory
   | OverwriteFiles
+  | NewPath
   | UnknownPromptTag
 
 {-| -}
@@ -295,6 +346,14 @@ askToOverwrite =
   Prompt.sequence promptTagToString
     |> Prompt.andThen (Prompt.askYesNo "Looks like the directory isn't empty, should we conitnue anyway?")
     |> Prompt.andThen (Prompt.expectBool OverwriteFiles)
+    |> Prompt.run
+
+{-| -}
+askForNewDirectory : Cmd msg
+askForNewDirectory =
+  Prompt.sequence promptTagToString
+    |> Prompt.andThen (Prompt.ask "Enter a new path to place the generated files.")
+    |> Prompt.andThen (Prompt.expectString NewPath)
     |> Prompt.run
 
 {-| This is essentially an alternative to Debug.log that we use to print some
@@ -314,27 +373,36 @@ gotPromptResponse response model =
     -- directories that don't exist, we'll create them all.
     Prompt.GotBool CreateDirectory True ->
       ( { model | createDirectory = True }
-      , Cmd.none
+      , fetchDocs model.arguments.name model.arguments.tag
       )
 
     -- The user has said it's *not* OK to create the output directory if
     -- necessary. This means we need to prompt rhem for a new outDir.
     Prompt.GotBool CreateDirectory False ->
       ( model
-      -- TODO: Prompt the user to select a new output directory
-      , Cmd.none
+      , askForNewDirectory
       )
 
-    -- 
     Prompt.GotBool OverwriteFiles True ->
       ( { model | overwriteFiles = True }
-      , Cmd.none
+      , fetchDocs model.arguments.name model.arguments.tag
       )
 
     Prompt.GotBool OverwriteFiles False ->
       ( model
-      -- TODO: Prompt the user to select a new output directory
-      , Cmd.none
+      , askForNewDirectory
+      )
+
+    Prompt.GotString NewPath dir ->
+      let
+        args = 
+          model.arguments
+
+        arguments =
+          { args | dir = dir }
+      in
+      ( { model | arguments = arguments }
+      , createOutDir dir
       )
 
     _ ->
@@ -352,6 +420,9 @@ promptTagToString tag =
     OverwriteFiles ->
       "OverwriteFiles"
 
+    NewPath ->
+      "NewPath"
+
     UnknownPromptTag ->
       ""
 
@@ -364,6 +435,9 @@ promptTagFromString tag =
 
     "OverwriteFiles" ->
       OverwriteFiles
+
+    "NewPath" ->
+      NewPath
 
     _ ->
       UnknownPromptTag
