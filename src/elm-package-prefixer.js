@@ -21,7 +21,9 @@ getPackages.then(packages => {
     flags: { args, packages: JSON.parse(packages) }
   })
 
-  app.ports.exit && app.ports.exit.subscribe(code => process.exit(code))
+  app.ports.exit && app.ports.exit.subscribe(code => {
+    setTimeout(() => process.exit(code || 1), 0)
+  })
 
   if (app.ports.toFilesystem && app.ports.fromFilesystem) {
     Filesystem.init(
