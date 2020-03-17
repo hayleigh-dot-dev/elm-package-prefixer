@@ -57,7 +57,7 @@ function expect ({ tag, type }, data, send) {
 function ask ({ question }, data) {
   data.push(
     new Promise(resolve => {
-      Prompt.quest(question + '\n', answer => {
+      Prompt.question(question + '\n', answer => {
         resolve({
           $: 'GotString', type: 'String', response: answer
         })
