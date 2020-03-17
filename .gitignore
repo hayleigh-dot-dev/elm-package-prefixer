@@ -3,6 +3,7 @@
 
 #
 elm-stuff
+src/elm/Env.elm
 
 #
 node_modules
