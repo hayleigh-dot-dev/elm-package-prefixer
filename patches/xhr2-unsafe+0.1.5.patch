@@ -1,0 +1,16 @@
+diff --git a/node_modules/xhr2-unsafe/lib/xhr2.js b/node_modules/xhr2-unsafe/lib/xhr2.js
+index 5471e71..7b1b386 100644
+--- a/node_modules/xhr2-unsafe/lib/xhr2.js
++++ b/node_modules/xhr2-unsafe/lib/xhr2.js
+@@ -615,6 +615,11 @@
+       } else {
+         buffer = this._concatBuffers(this._responseParts);
+       }
++      // temporary workaround for transport encoding parsing
++      if (this._responseHeaders['content-encoding'] && this._responseHeaders['content-encoding'] === 'gzip') {
++          buffer = require('zlib').gunzipSync(buffer);
++      }
++      console.log('response parse', this._responseHeaders);
+       this._responseParts = null;
+       switch (this.responseType) {
+         case 'text':

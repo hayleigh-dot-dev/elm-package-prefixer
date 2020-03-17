@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-global.XMLHttpRequest = require('xmlhttprequest').XMLHttpRequest
+global.XMLHttpRequest = require('xhr2-unsafe')
 
 process.env.NODE_ENV === 'development'
   ? require('./bin/elm-package-prefixer.dev.js')
