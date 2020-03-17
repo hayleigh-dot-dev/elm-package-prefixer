@@ -6,10 +6,7 @@ export function init (send, recv) {
   recv(sequence => {
     const data = []
 
-    console.log(sequence)
     sequence.forEach(msg => {
-      console.log('Filesystem: ', msg)
-
       switch (msg.$) {
         case 'Expect':
           expectResponse(msg, data, send)
@@ -52,7 +49,7 @@ function expectResponse ({ tag, type }, data, send) {
           : send({ tag, $: 'Err', message: `Expecting response of type ${type} but got ${res.type} instead.` })
       })
       .catch(err => {
-        send({ tag, $: 'Err', message: err })
+        send({ tag, $: 'Err', message: err.code })
       })
   }
 }
