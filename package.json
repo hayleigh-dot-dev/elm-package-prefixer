@@ -2,7 +2,7 @@
   "name": "elm-package-prefixer",
   "version": "1.0.0",
   "description": "Prefix existing elm packages to avoid namespace collisions.",
-  "main": "bin/elm-package-prefixer",
+  "main": "index.js",
   "scripts": {
     "build": "NODE_ENV=production node build.js",
     "build:dev": "NODE_ENV=development node build.js"
