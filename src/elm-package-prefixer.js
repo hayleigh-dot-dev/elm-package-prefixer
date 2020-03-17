@@ -9,14 +9,16 @@ const Prompt = require('./js/prompt')
 const isDev = process.env.NODE_ENV === 'development'
 
 const getPackages = isDev
-  ? Fs.promises.readFile(Path.join(__dirname, 'packages.json'))
-  : Fetch('https://package.elm-lang.org/search.json').then(response => response.json())
+  ? Fs.promises.readFile(Path.join(__dirname, 'packages.json'), {
+    encoding: 'utf8'
+  })
+  : Fetch('https://package.elm-lang.org/search.json').then(response => response.text())
 
 //
 getPackages.then(packages => {
   const args = process.argv.slice(2).join(' ')
   const app = Elm.Main.init({
-    flags: { args, packages }
+    flags: { args, packages: JSON.parse(packages) }
   })
 
   app.ports.exit && app.ports.exit.subscribe(code => process.exit(code))
