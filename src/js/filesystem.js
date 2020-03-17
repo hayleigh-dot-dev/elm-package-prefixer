@@ -55,10 +55,9 @@ function expectResponse ({ tag, type }, data, send) {
 }
 
 /* */
-function makeDir ({ path, dirname }) {
-  Filesystem.promises.mkdir(Path.join(path, dirname), {
-    recursive: true
-  })
+function makeDir ({ path }) {
+  Filesystem.promises.mkdir(path, { recursive: true })
+    .catch(() => {})
 }
 
 /* */
