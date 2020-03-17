@@ -9,7 +9,7 @@ function generateEnvModule () {
     .map(([k, v]) => [k.toLocaleLowerCase(), v])
 
   const header = [
-    `module Env exposing (${envVars.join(', ')})`,
+    `module Env exposing (${envVars.map(([k]) => k).join(', ')})`,
     '',
     '-- This file was generated automatically at build time. Do not edit it and',
     '-- do not check it into git.',
