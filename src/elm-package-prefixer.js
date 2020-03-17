@@ -3,7 +3,10 @@ const { Elm } = require('./elm/Main.elm')
 const Fetch = require('node-fetch')
 const Fs = require('fs')
 const Path = require('path')
-const XMLHttpRequest = require('xmlhttprequest').XMLHttpRequest
+const { XMLHttpRequest } = require('xmlhttprequest')
+
+const Filesystem = require('./js/filesystem')
+const Prompt = require('./js/prompt')
 
 const isDev = process.env.NODE_ENV === 'development'
 
@@ -11,6 +14,7 @@ const getPackages = isDev
   ? Fs.promises.readFile(Path.join(__dirname, 'packages.json'))
   : Fetch('https://package.elm-lang.org/search.json').then(response => response.json())
 
+//
 getPackages.then(packages => {
   global.XMLHttpRequest = XMLHttpRequest
 
@@ -19,9 +23,21 @@ getPackages.then(packages => {
     flags: { args, packages }
   })
 
-  app.ports.log && app.ports.log.subscribe(message => {
-    console.log(message)
-  })
+  app.ports.exit && app.ports.exit.subscribe(code => process.exit(code))
+
+  if (app.ports.toFilesystem && app.ports.fromFilesystem) {
+    Filesystem.init(
+      app.ports.fromFilesystem.send,
+      app.ports.toFilesystem.subscribe
+    )
+  }
+
+  if (app.ports.toPrompt && app.ports.fromPrompt) {
+    Prompt.init(
+      app.ports.fromPrompt.send,
+      app.ports.toPrompt.subscribe
+    )
+  }
 }).catch(e => {
   console.error(e)
 })
