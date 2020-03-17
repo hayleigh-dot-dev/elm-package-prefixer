@@ -2,14 +2,19 @@ port module Main exposing (main)
 
 {- Imports ------------------------------------------------------------------ -}
 import Arguments exposing (Arguments)
+import Http
 import Json.Decode
+import Task
 
 import Ports.Filesystem as Filesystem
 import Ports.Prompt as Prompt
 
+import Env
 
 {- Ports -------------------------------------------------------------------- -}
-{-| -}
+{-| A direct call to process.exit() in javascript land. We can pass in an Int as
+the exit code. 0 for success, 1 for failure.
+-}
 port exit : Int -> Cmd msg
 
 
@@ -79,10 +84,13 @@ init ({ args } as flags) =
 initHelp : String -> (Maybe Model, Cmd Msg)
 initHelp args =
   ( Nothing
-  , Arguments.parseHelp args
-      |> Arguments.showHelp
-      |> Prompt.notify
-      |> Prompt.runAction never
+  , Cmd.batch
+      [ Arguments.parseHelp args
+          |> Arguments.showHelp
+          |> Prompt.notify
+          |> Prompt.runAction never
+      , exit 0
+      ]
   )
 
 {-| Even though we're initialising the "real" app at this point, now we have a
@@ -100,35 +108,84 @@ initApp { args, packages } =
           { arguments = arguments
           , createDirectory = False
           , overwriteFiles = False
-          , packages = decodePackageNames packages
+          , packages = []
           }
-      , checkOutDir arguments.dir
+      , if Env.node_env == "development" then
+          -- This process is used to essentially simulate a HTTP request during
+          -- development. We don't want to hit the package servers every time we
+          -- run the program!
+          Json.Decode.decodeValue packageNamesDecoder packages
+            |> Result.mapError (\_ -> Http.NetworkError)
+            |> Task.succeed
+            |> Task.perform GotPackages
+
+        else
+          fetchPackageNames
       )
 
     Err _ ->
       ( Nothing
-      , Cmd.none
+      , Cmd.batch
+        [ notify
+            <| "Error parsing arguments, try running the program again with the "
+            ++ "--help flag to see what I can do."
+        , exit 1
+        ]
       )
 
+{-| We only care about the package names (for now). We use them to match against
+the package name passed in as an argument; there's no sense trying to prefix a
+package that doesn't exist.
+-}
+packageNamesDecoder : Json.Decode.Decoder (List String)
+packageNamesDecoder =
+  Json.Decode.list <| Json.Decode.field "name" Json.Decode.string
+
 {-| -}
-decodePackageNames : Json.Decode.Value -> List String
-decodePackageNames packages =
-  packages
-    |> Json.Decode.decodeValue
-      (Json.Decode.list <| Json.Decode.field "name" Json.Decode.string)
-    |> Result.withDefault []
+fetchPackageNames : Cmd Msg
+fetchPackageNames =
+  Http.get
+    { url = "https://package.elm-lang.org/search.json"
+    , expect = Http.expectJson GotPackages packageNamesDecoder
+    }
 
 
 {- Update ------------------------------------------------------------------- -}
 {-| -}
 type Msg
-  = GotFilesystemResponse (Filesystem.Response FilesystemTag)
+  = GotPackages (Result Http.Error (List String))
+  -- Ports responses
+  | GotFilesystemResponse (Filesystem.Response FilesystemTag)
   | GotPromptResponse (Prompt.Response PromptTag)
 
 {-| -}
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
-  case msg of
+  case Debug.log "msg" msg of
+    GotPackages (Ok packages) ->
+      -- TODO: Should we save the result to a file to be used as cache in the
+      -- future?
+      ( { model | packages = packages }
+      , if List.member model.arguments.name packages then
+          checkOutDir model.arguments.dir
+
+        else
+          Cmd.batch
+            [ notify 
+                <| "Package could not be found on the elm package website, did "
+                ++ "you spell it correctly?"
+            , exit 1
+            ]
+      )
+
+    GotPackages (Err _) ->
+      ( model
+      , Cmd.batch
+          [ notify "Error fetching packages from the elm package website."
+          , exit 1
+          ]
+      )
+
     GotPromptResponse response ->
       gotPromptResponse response model
 
@@ -164,10 +221,11 @@ type FilesystemTag
   = OutDir
   | UnknownFilesystemTag
 
+{-| -}
 checkOutDir : String -> Cmd msg
-checkOutDir outDir =
+checkOutDir dir =
   Filesystem.sequence filesystemTagToString
-    |> Filesystem.andThen (Filesystem.readDir outDir)
+    |> Filesystem.andThen (Filesystem.readDir dir)
     |> Filesystem.andThen (Filesystem.expectDir OutDir)
     |> Filesystem.run
 
@@ -195,6 +253,7 @@ gotFilesystemResponse response model =
       , Cmd.none
       )
 
+{-| -}
 filesystemTagToString : FilesystemTag -> String
 filesystemTagToString tag =
   case tag of
@@ -204,6 +263,7 @@ filesystemTagToString tag =
     UnknownFilesystemTag ->
       ""
 
+{-| -}
 filesystemTagFromString : String -> FilesystemTag
 filesystemTagFromString tag =
   case tag of
@@ -221,6 +281,7 @@ type PromptTag
   | OverwriteFiles
   | UnknownPromptTag
 
+{-| -}
 askToCreateDirectory : Cmd msg
 askToCreateDirectory =
   Prompt.sequence promptTagToString
@@ -236,6 +297,14 @@ askToOverwrite =
     |> Prompt.andThen (Prompt.expectBool OverwriteFiles)
     |> Prompt.run
 
+{-| This is essentially an alternative to Debug.log that we use to print some
+message to the user without expecting a response.
+-}
+notify : String -> Cmd msg
+notify notice =
+  Prompt.notify notice
+    |> Prompt.runAction never
+
 {-| -}
 gotPromptResponse : Prompt.Response PromptTag -> Model -> (Model, Cmd Msg)
 gotPromptResponse response model =
@@ -244,9 +313,7 @@ gotPromptResponse response model =
     -- exist. If the user supplied an outDir that was a path with multiple
     -- directories that don't exist, we'll create them all.
     Prompt.GotBool CreateDirectory True ->
-      ( { model
-        | createDirectory = True
-        }
+      ( { model | createDirectory = True }
       , Cmd.none
       )
 
@@ -254,20 +321,20 @@ gotPromptResponse response model =
     -- necessary. This means we need to prompt rhem for a new outDir.
     Prompt.GotBool CreateDirectory False ->
       ( model
-      , Debug.todo "Prompt user for a new output directory."
+      -- TODO: Prompt the user to select a new output directory
+      , Cmd.none
       )
 
     -- 
     Prompt.GotBool OverwriteFiles True ->
-      ( { model
-        | overwriteFiles = True
-        }
+      ( { model | overwriteFiles = True }
       , Cmd.none
       )
 
     Prompt.GotBool OverwriteFiles False ->
       ( model
-      , Debug.todo "Prompt user for a new output directory."
+      -- TODO: Prompt the user to select a new output directory
+      , Cmd.none
       )
 
     _ ->
