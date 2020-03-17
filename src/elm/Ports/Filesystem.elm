@@ -31,7 +31,7 @@ type Sequence tag
 {-| -}
 type Action tag
   = Expect ResponseType tag
-  | MakeDir String String
+  | MakeDir String
   | ReadDir String
   | ReadFile String String
   | WriteFile String String String
@@ -105,9 +105,9 @@ expectPath tag =
 
 {- Actions ------------------------------------------------------------------ -}
 {-| -}
-makeDir : String -> String -> Action tag
-makeDir path dirname =
-  MakeDir path dirname
+makeDir : String -> Action tag
+makeDir path =
+  MakeDir path
 
 {-| -}
 readDir : String -> Action tag
@@ -137,11 +137,10 @@ encode toString action =
         , ("tag", Json.Encode.string (toString tag))
         ]
 
-    MakeDir path dirname ->
+    MakeDir path ->
       Json.Encode.object
         [ ("$", Json.Encode.string "MakeDir")
         , ("path", Json.Encode.string path)
-        , ("dirname", Json.Encode.string dirname)
         ]
 
 
