@@ -3,6 +3,7 @@ port module Main exposing (main)
 {- Imports ------------------------------------------------------------------ -}
 import Arguments exposing (Arguments)
 import Elm.Docs
+import Generate
 import Http
 import Json.Decode
 import Task
@@ -50,10 +51,11 @@ main =
 {- Model -------------------------------------------------------------------- -}
 {-| -}
 type alias Model =
-  { arguments : Arguments   -- Arguments passed in on program start
-  , createDirectory : Bool  -- Should we create the directory if it doesn't exist?
-  , overwriteFiles : Bool   -- Should we continue if files already exist in that directory?
-  , packages : List String  -- All the packages that exist on package.elm-lang.org
+  { arguments : Arguments           -- Arguments passed in on program start
+  , createDirectory : Bool          -- Should we create the directory if it doesn't exist?
+  , overwriteFiles : Bool           -- Should we continue if files already exist in that directory?
+  , packages : List String          -- All the packages that exist on package.elm-lang.org
+  , modules : List (String, String) -- The generated modules, tuple of (path, module).
   }
 
 {-| -}
@@ -110,6 +112,7 @@ initApp { args, packages } =
           , createDirectory = False
           , overwriteFiles = False
           , packages = []
+          , modules = []
           }
       , if Env.node_env == "development" then
           -- This process is used to essentially simulate a HTTP request during
@@ -189,8 +192,17 @@ update msg model =
       )
 
     GotPackageDocs (Ok docs) ->
+      let
+        modules =
+          List.map (Generate.moduleFromDocs model.arguments.dir model.arguments.prefix) docs
+      in
       ( model
-      , Cmd.none
+      , Cmd.batch (modules |> List.map (\{ path, name, body } ->
+          Filesystem.sequence never
+            |> Filesystem.andThen (Filesystem.makeDir path)
+            |> Filesystem.andThen (Filesystem.writeFile path (name ++ ".elm") body)
+            |> Filesystem.run
+        ))
       )
 
     GotPackageDocs (Err _) ->
@@ -373,7 +385,10 @@ gotPromptResponse response model =
     -- directories that don't exist, we'll create them all.
     Prompt.GotBool CreateDirectory True ->
       ( { model | createDirectory = True }
-      , fetchDocs model.arguments.name model.arguments.tag
+      , Cmd.batch
+        [ fetchDocs model.arguments.name model.arguments.tag
+        , createOutDir model.arguments.dir
+        ]
       )
 
     -- The user has said it's *not* OK to create the output directory if
