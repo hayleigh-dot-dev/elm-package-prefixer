@@ -44,7 +44,7 @@ const options = {
   cacheDir: '.cache',
   contentHash: false,
   minify: process.env.NODE_ENV === 'production',
-  scopeHoist: true,
+  scopeHoist: false,
   target: 'node',
   logLevel: 3,
   hmr: false,
