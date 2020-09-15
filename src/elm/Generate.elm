@@ -36,6 +36,8 @@ moduleFromDocs dir prefix module_ =
       String.join "\n"
         [ "module " ++ prefix ++ "." ++ module_.name ++ " exposing (" ++ String.join ", " exposing_ ++ ")"
         , ""
+        , "{-|" ++ module_.comment ++ "-}"
+        , ""
         , "import " ++ module_.name
         , ""
         ]
