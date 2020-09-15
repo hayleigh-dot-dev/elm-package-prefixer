@@ -43,12 +43,11 @@ moduleFromDocs dir prefix module_ =
             String.join "\n"
                 [ "module " ++ prefix ++ "." ++ module_.name ++ " exposing (" ++ String.join ", " exposing_ ++ ")"
                 , ""
+                , "{-|" ++ module_.comment ++ "-}"
+                , ""
                 , "import " ++ module_.name
                 , ""
                 ]
-
-        docs =
-            "@docs " ++ String.join ", " (exposingFromBlocks <| Elm.Docs.toBlocks module_)
 
         exposing_ =
             exposingFromBlocks (Elm.Docs.toBlocks module_)
@@ -61,7 +60,6 @@ moduleFromDocs dir prefix module_ =
     , body =
         String.join "\n\n"
             [ header
-            , docs
             , body
             ]
     }
@@ -108,16 +106,16 @@ bodyFromBlocks moduleName blocks =
                         Just <|
                             String.join "\n"
                                 [ "{-|" ++ comment ++ "-}"
-                                , "type alias " ++ name ++ " " ++ String.join " " args ++ " ="
-                                , "  " ++ moduleName ++ "." ++ name
+                                , "type alias " ++ String.join " " (name :: args) ++ " ="
+                                , "  " ++ moduleName ++ "." ++ String.join " " (name :: args)
                                 ]
 
                     Elm.Docs.AliasBlock { name, comment, args } ->
                         Just <|
                             String.join "\n"
                                 [ "{-|" ++ comment ++ "-}"
-                                , "type alias " ++ name ++ " " ++ String.join " " args ++ " ="
-                                , "  " ++ moduleName ++ "." ++ name
+                                , "type alias " ++ String.join " " (name :: args) ++ " ="
+                                , "  " ++ moduleName ++ "." ++ String.join " " (name :: args)
                                 ]
 
                     Elm.Docs.ValueBlock { name, comment, tipe } ->
@@ -137,6 +135,41 @@ bodyFromBlocks moduleName blocks =
             )
 
 
+{-| From default imports listing at <https://package.elm-lang.org/packages/elm/core/latest/>
+-}
+fixTypeName : String -> String
+fixTypeName name =
+    if String.startsWith "Basics." name then
+        String.dropLeft 7 name
+
+    else if name == "List.List" then
+        "List"
+
+    else if name == "Maybe.Maybe" then
+        "Maybe"
+
+    else if name == "Result.Result" then
+        "Result"
+
+    else if name == "String.String" then
+        "String"
+
+    else if name == "Char.Char" then
+        "Char"
+
+    else
+        name
+
+
+fixTypeParameter : String -> String
+fixTypeParameter name =
+    if String.contains " " name then
+        "(" ++ name ++ ")"
+
+    else
+        name
+
+
 {-| -}
 annotationFromType : Elm.Type.Type -> String
 annotationFromType type_ =
@@ -151,7 +184,7 @@ annotationFromType type_ =
             "( " ++ String.join ", " (List.map annotationFromType ts) ++ " )"
 
         Elm.Type.Type name ts ->
-            name ++ " " ++ String.join " " (List.map annotationFromType ts)
+            String.join " " (fixTypeName name :: List.map (annotationFromType >> fixTypeParameter) ts)
 
         Elm.Type.Record fields _ ->
             "{ " ++ String.join ", " (List.map (\( name, t ) -> name ++ " : " ++ annotationFromType t) fields) ++ " }"
