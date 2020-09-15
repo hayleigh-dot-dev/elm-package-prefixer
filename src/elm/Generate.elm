@@ -183,6 +183,9 @@ annotationFromType type_ =
         Elm.Type.Var name ->
             name
 
+        Elm.Type.Lambda ((Elm.Type.Lambda _ _) as a) b ->
+            "(" ++ annotationFromType a ++ ") -> " ++ annotationFromType b
+
         Elm.Type.Lambda a b ->
             annotationFromType a ++ " -> " ++ annotationFromType b
 
