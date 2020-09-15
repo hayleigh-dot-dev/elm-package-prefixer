@@ -93,15 +93,15 @@ bodyFromBlocks moduleName blocks =
       Elm.Docs.UnionBlock { name, comment, args } ->
         Just <| String.join "\n"
           [ "{-|" ++ comment ++ "-}"
-          , "type alias " ++ name ++ " " ++ String.join " " args ++ " ="
           , "  " ++ moduleName ++ "." ++ name
+          , "type alias " ++ String.join " " (name :: args) ++ " ="
           ]
 
       Elm.Docs.AliasBlock { name, comment, args } ->
         Just <| String.join "\n"
           [ "{-|" ++ comment ++ "-}"
-          , "type alias " ++ name ++ " " ++ String.join " " args ++ " ="
           , "  " ++ moduleName ++ "." ++ name
+          , "type alias " ++ String.join " " (name :: args) ++ " ="
           ]
 
       Elm.Docs.ValueBlock { name, comment, tipe } ->
