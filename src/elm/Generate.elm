@@ -163,11 +163,17 @@ fixTypeName name =
 
 fixTypeParameter : String -> String
 fixTypeParameter name =
-    if String.contains " " name then
+    if String.contains " " name && not (isParenthesized name) then
         "(" ++ name ++ ")"
 
     else
         name
+
+
+isParenthesized : String -> Bool
+isParenthesized name =
+    (String.startsWith "(" name && String.endsWith ")" name)
+        || (String.startsWith "{" name && String.endsWith "}" name)
 
 
 {-| -}
