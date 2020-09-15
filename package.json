@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Prefix existing elm packages to avoid namespace collisions.",
   "main": "index.js",
+  "bin": {
+    "elm-package-prefixer": "./index.js"
+  },
   "scripts": {
     "build": "NODE_ENV=production node build.js",
     "build:dev": "NODE_ENV=development node build.js",
@@ -15,7 +18,7 @@
     "cli",
     "tool"
   ],
-  "author": "",
+  "author": "Andy Thompson",
   "license": "MIT",
   "devDependencies": {
     "node-elm-compiler": "^5.0.4",
