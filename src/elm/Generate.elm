@@ -119,6 +119,38 @@ bodyFromBlocks moduleName blocks =
         Nothing
   )
 
+{-| From default imports listing at https://package.elm-lang.org/packages/elm/core/latest/ -}
+fixTypeName : String -> String
+fixTypeName name =
+  if String.startsWith "Basics." name then
+    String.dropLeft 7 name
+  
+  else if name == "List.List" then
+    "List"
+
+  else if name == "Maybe.Maybe" then
+    "Maybe"
+
+  else if name == "Result.Result" then
+    "Result"
+
+  else if name == "String.String" then
+    "String"
+
+  else if name == "Char.Char" then
+    "Char"
+
+  else
+    name
+
+fixTypeParameter : String -> String
+fixTypeParameter name =
+  if String.contains " " name then
+    "(" ++ name ++ ")"
+
+  else
+    name
+
 {-| -}
 annotationFromType : Elm.Type.Type -> String
 annotationFromType type_ =
@@ -133,7 +165,7 @@ annotationFromType type_ =
       "( " ++ String.join ", " (List.map annotationFromType ts) ++ " )"
 
     Elm.Type.Type name ts ->
-      name ++ " " ++ String.join " " (List.map annotationFromType ts)
+      String.join " " (fixTypeName name :: List.map (annotationFromType >> fixTypeParameter) ts)
 
     Elm.Type.Record fields _ ->
       "{ " ++ String.join ", " (List.map (\(name, t) -> name ++ " : " ++ annotationFromType t) fields) ++ " }"
