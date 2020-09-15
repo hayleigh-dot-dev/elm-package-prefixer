@@ -42,8 +42,6 @@ moduleFromDocs dir prefix module_ =
         , ""
         ]
 
-    docs = 
-      "@docs " ++ String.join ", " (exposingFromBlocks <| Elm.Docs.toBlocks module_)
 
     exposing_ =
       exposingFromBlocks (Elm.Docs.toBlocks module_)
@@ -56,7 +54,6 @@ moduleFromDocs dir prefix module_ =
   , body =
       String.join "\n\n"
         [ header
-        , docs
         , body
         ]
   }
