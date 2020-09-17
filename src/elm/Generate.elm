@@ -4,6 +4,7 @@ module Generate exposing (moduleFromDocs)
 
 import Elm.Docs
 import Elm.Type
+import Set exposing (Set)
 
 
 
@@ -45,7 +46,7 @@ moduleFromDocs dir prefix module_ =
                 , ""
                 , "{-|" ++ module_.comment ++ "-}"
                 , ""
-                , "import " ++ module_.name
+                , importLines module_
                 , ""
                 ]
 
@@ -63,6 +64,130 @@ moduleFromDocs dir prefix module_ =
             , body
             ]
     }
+
+
+{-| -}
+importLines : Elm.Docs.Module -> String
+importLines module_ =
+    let
+        moduleNames =
+            Set.singleton module_.name
+                |> getModuleNamesFromUnions module_.unions
+                |> getModuleNamesFromAliases module_.aliases
+                |> getModuleNamesFromValues module_.values
+    in
+    Set.toList moduleNames
+        |> List.map (\name -> "import " ++ name)
+        |> String.join "\n"
+
+
+{-| -}
+getModuleNamesFromUnions : List Elm.Docs.Union -> Set String -> Set String
+getModuleNamesFromUnions unions accumulated =
+    case unions of
+        first :: rest ->
+            accumulated
+                |> getModuleNamesFromTags first.tags
+                |> getModuleNamesFromUnions rest
+
+        [] ->
+            accumulated
+
+
+{-| -}
+getModuleNamesFromTags : List ( String, List Elm.Type.Type ) -> Set String -> Set String
+getModuleNamesFromTags tags accumulated =
+    case tags of
+        ( _, types ) :: rest ->
+            accumulated
+                |> getModuleNamesFromTypes types
+                |> getModuleNamesFromTags rest
+
+        [] ->
+            accumulated
+
+
+{-| -}
+getModuleNamesFromAliases : List Elm.Docs.Alias -> Set String -> Set String
+getModuleNamesFromAliases aliases accumulated =
+    case aliases of
+        first :: rest ->
+            accumulated
+                |> getModuleNamesFromType first.tipe
+                |> getModuleNamesFromAliases rest
+
+        [] ->
+            accumulated
+
+
+{-| -}
+getModuleNamesFromValues : List Elm.Docs.Value -> Set String -> Set String
+getModuleNamesFromValues values accumulated =
+    case values of
+        first :: rest ->
+            accumulated
+                |> getModuleNamesFromType first.tipe
+                |> getModuleNamesFromValues rest
+
+        [] ->
+            accumulated
+
+
+{-| -}
+getModuleNamesFromTypes : List Elm.Type.Type -> Set String -> Set String
+getModuleNamesFromTypes types accumulated =
+    List.foldl getModuleNamesFromType accumulated types
+
+
+getModuleNamesFromType : Elm.Type.Type -> Set String -> Set String
+getModuleNamesFromType type_ accumulated =
+    case type_ of
+        Elm.Type.Var _ ->
+            accumulated
+
+        Elm.Type.Lambda argument result ->
+            accumulated
+                |> getModuleNamesFromType argument
+                |> getModuleNamesFromType result
+
+        Elm.Type.Tuple nestedTypes ->
+            accumulated
+                |> getModuleNamesFromTypes nestedTypes
+
+        Elm.Type.Type typeName arguments ->
+            accumulated
+                |> addModuleNameFromTypeName typeName
+                |> getModuleNamesFromTypes arguments
+
+        Elm.Type.Record fields _ ->
+            accumulated
+                |> getModuleNamesFromTypes (List.map Tuple.second fields)
+
+
+{-| -}
+addModuleNameFromTypeName : String -> Set String -> Set String
+addModuleNameFromTypeName typeName accumulated =
+    let
+        -- inefficient hackery to get all but the last component of a fully qualified type name
+        moduleName =
+            typeName
+                |> String.split "."
+                |> List.reverse
+                |> List.drop 1
+                |> List.reverse
+                |> String.join "."
+    in
+    if String.isEmpty moduleName || List.member moduleName defaultImportedModuleNames then
+        accumulated
+
+    else
+        Set.insert moduleName accumulated
+
+
+{-| -}
+defaultImportedModuleNames : List String
+defaultImportedModuleNames =
+    [ "Basics", "List", "Maybe", "Result", "String", "Char" ]
 
 
 {-| -}
@@ -163,11 +288,17 @@ fixTypeName name =
 
 fixTypeParameter : String -> String
 fixTypeParameter name =
-    if String.contains " " name then
+    if String.contains " " name && not (isParenthesized name) then
         "(" ++ name ++ ")"
 
     else
         name
+
+
+isParenthesized : String -> Bool
+isParenthesized name =
+    (String.startsWith "(" name && String.endsWith ")" name)
+        || (String.startsWith "{" name && String.endsWith "}" name)
 
 
 {-| -}
@@ -176,6 +307,9 @@ annotationFromType type_ =
     case type_ of
         Elm.Type.Var name ->
             name
+
+        Elm.Type.Lambda ((Elm.Type.Lambda _ _) as a) b ->
+            "(" ++ annotationFromType a ++ ") -> " ++ annotationFromType b
 
         Elm.Type.Lambda a b ->
             annotationFromType a ++ " -> " ++ annotationFromType b
