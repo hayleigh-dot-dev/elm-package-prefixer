@@ -177,7 +177,7 @@ addModuleNameFromTypeName typeName accumulated =
                 |> List.reverse
                 |> String.join "."
     in
-    if String.isEmpty moduleName || List.member moduleName builtinModuleNames then
+    if String.isEmpty moduleName || List.member moduleName defaultImportedModuleNames then
         accumulated
 
     else
@@ -185,8 +185,8 @@ addModuleNameFromTypeName typeName accumulated =
 
 
 {-| -}
-builtinModuleNames : List String
-builtinModuleNames =
+defaultImportedModuleNames : List String
+defaultImportedModuleNames =
     [ "Basics", "List", "Maybe", "Result", "String", "Char" ]
 
 
