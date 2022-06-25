@@ -27,7 +27,7 @@
     "@babel/compat-data": "^7.9.0"
   },
   "dependencies": {
-    "node-fetch": "^2.6.1",
+    "node-fetch": "^2.6.7",
     "xhr2-unsafe": "^0.1.5"
   }
 }
